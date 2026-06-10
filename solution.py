@@ -43,15 +43,10 @@ def extract(file_path):
     """
     print(f"Extracting data from {file_path}...")
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        print(f"Successfully extracted {len(data)} records from {file_path}.")
-        return data
+        with open(file_path, 'r') as f:
+            return json.load(f)
     except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found.")
-        return []
-    except json.JSONDecodeError as e:
-        print(f"Error: Failed to parse JSON file. {e}")
+        print(f"Error: {file_path} not found.")
         return []
 
 
@@ -63,36 +58,28 @@ def validate(data):
        - Price phai > 0 (loai bo gia am hoac bang 0)
        - Category khong duoc rong
 
-    Goi y:
-       - Dung record.get('price', 0) de lay gia
-       - Dung record.get('category') de kiem tra category
-       - In ra so luong record hop le va khong hop le
-
     Returns:
         list: Danh sach cac records hop le
     """
     valid_records = []
-    error_count = 0
+    dropped_records = []
 
     for record in data:
-        price = record.get('price', 0)
-        category = record.get('category', '')
-
-        # Kiem tra price > 0
-        if price is None or float(price) <= 0:
-            error_count += 1
-            print(f"  [DROPPED] Record ID={record.get('id')} - Invalid price: {price}")
+        # Check Price
+        if record.get('price', 0) <= 0:
+            dropped_records.append({"id": record.get('id'), "reason": "Price <= 0"})
             continue
 
-        # Kiem tra category khong rong
-        if not category or str(category).strip() == '':
-            error_count += 1
-            print(f"  [DROPPED] Record ID={record.get('id')} - Empty category")
+        # Check Category
+        if not record.get('category'):
+            dropped_records.append({"id": record.get('id'), "reason": "Missing Category"})
             continue
 
         valid_records.append(record)
 
-    print(f"Validation complete. Valid: {len(valid_records)} kept, {error_count} dropped (errors/invalid records).")
+    print(f"Validation summary: {len(valid_records)} kept, {len(dropped_records)} dropped.")
+    if dropped_records:
+        print(f"Errors found: {dropped_records}")
     return valid_records
 
 
@@ -102,46 +89,32 @@ def transform(data):
 
     Yeu cau:
        - Tinh discounted_price = price * 0.9 (giam 10%)
-       - Chuan hoa category thanh Title Case (vi du: "electronics" -> "Electronics")
+       - Chuan hoa category thanh Title Case
        - Them cot processed_at = timestamp hien tai
-
-    Goi y:
-       - Dung pd.DataFrame(data) de tao DataFrame
-       - df['discounted_price'] = df['price'] * 0.9
-       - df['category'] = df['category'].str.title()
-       - df['processed_at'] = datetime.datetime.now().isoformat()
 
     Returns:
         pd.DataFrame: DataFrame da duoc transform
     """
-    if not data:
-        print("No data to transform.")
-        return None
-
     df = pd.DataFrame(data)
 
-    # Tinh discounted_price (giam 10%)
+    # Logic 1: Discount
     df['discounted_price'] = df['price'] * 0.9
 
-    # Chuan hoa category thanh Title Case
+    # Logic 2: Formatting
     df['category'] = df['category'].str.title()
 
-    # Them cot processed_at
+    # Logic 3: Metadata (Observability)
     df['processed_at'] = datetime.datetime.now().isoformat()
 
-    print(f"Transform complete. {len(df)} records processed successfully.")
     return df
 
 
 def load(df, output_path):
     """
     Task 4: Luu DataFrame ra file CSV.
-
-    Goi y:
-       - df.to_csv(output_path, index=False)
     """
     df.to_csv(output_path, index=False)
-    print(f"Data saved to {output_path}")
+    print(f"Successfully loaded {len(df)} records to {output_path}")
 
 
 # ============================================================
